@@ -21,7 +21,10 @@ import com.graphhopper.jsprit.core.algorithm.VehicleRoutingAlgorithm;
 import com.graphhopper.jsprit.core.algorithm.box.Jsprit;
 import com.graphhopper.jsprit.core.problem.Location;
 import com.graphhopper.jsprit.core.problem.VehicleRoutingProblem;
+import com.graphhopper.jsprit.core.problem.constraint.SoftConstraint;
+import com.graphhopper.jsprit.core.problem.constraint.SoftRouteConstraint;
 import com.graphhopper.jsprit.core.problem.job.Service;
+import com.graphhopper.jsprit.core.problem.misc.JobInsertionContext;
 import com.graphhopper.jsprit.core.problem.solution.VehicleRoutingProblemSolution;
 import com.graphhopper.jsprit.core.problem.vehicle.VehicleImpl;
 import com.graphhopper.jsprit.core.problem.vehicle.VehicleImpl.Builder;
@@ -50,16 +53,20 @@ public class MultipleTimeWindowExample {
 		/*
          * get a vehicle-builder and build a vehicle located at (10,10) with type "vehicleType"
 		 */
-        Builder vehicleBuilder = Builder.newInstance("vehicle");
+        Builder vehicleBuilder = Builder.newInstance("vehicle1");
         vehicleBuilder.setStartLocation(Location.newInstance(0, 0));
         vehicleBuilder.setType(vehicleType);
         VehicleImpl vehicle = vehicleBuilder.build();
+
+        Builder vehicleBuilder2 = Builder.newInstance("vehicle2");
+        vehicleBuilder2.setStartLocation(Location.newInstance(0, 0));
+        vehicleBuilder2.setType(vehicleType);
+        VehicleImpl vehicle2 = vehicleBuilder2.build();
 
 		/*
          * build services at the required locations, each with a capacity-demand of 1.
 		 */
         Service service1 = Service.Builder.newInstance("1")
-            .addTimeWindow(50,100)
             .addTimeWindow(20,35)
             .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(10, 0)).build();
 
@@ -85,13 +92,22 @@ public class MultipleTimeWindowExample {
             .addTimeWindow(60,100)
             .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(20, 0)).build();
 
+        Service service6 = Service.Builder.newInstance("6")
+            .addTimeWindow(20,30)
+            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(30, 0)).build();
 
         VehicleRoutingProblem.Builder vrpBuilder = VehicleRoutingProblem.Builder.newInstance();
-        vrpBuilder.addVehicle(vehicle);
-        vrpBuilder.addJob(service1).addJob(service2)
+        vrpBuilder
+            .addVehicle(vehicle)
+            .addVehicle(vehicle2)
+        ;
+        vrpBuilder
+            .addJob(service1)
+            .addJob(service2)
             .addJob(service3)
             .addJob(service4)
             .addJob(service5)
+            .addJob(service6)
         ;
         vrpBuilder.setFleetSize(VehicleRoutingProblem.FleetSize.FINITE);
         vrpBuilder.setRoutingCost(new ManhattanCosts());
