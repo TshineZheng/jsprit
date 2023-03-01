@@ -17,14 +17,12 @@
  */
 package com.graphhopper.jsprit.examples;
 
+import com.graphhopper.jsprit.analysis.toolbox.GraphStreamViewer;
 import com.graphhopper.jsprit.core.algorithm.VehicleRoutingAlgorithm;
 import com.graphhopper.jsprit.core.algorithm.box.Jsprit;
 import com.graphhopper.jsprit.core.problem.Location;
 import com.graphhopper.jsprit.core.problem.VehicleRoutingProblem;
-import com.graphhopper.jsprit.core.problem.constraint.SoftConstraint;
-import com.graphhopper.jsprit.core.problem.constraint.SoftRouteConstraint;
 import com.graphhopper.jsprit.core.problem.job.Service;
-import com.graphhopper.jsprit.core.problem.misc.JobInsertionContext;
 import com.graphhopper.jsprit.core.problem.solution.VehicleRoutingProblemSolution;
 import com.graphhopper.jsprit.core.problem.vehicle.VehicleImpl;
 import com.graphhopper.jsprit.core.problem.vehicle.VehicleImpl.Builder;
@@ -34,14 +32,16 @@ import com.graphhopper.jsprit.core.reporting.SolutionPrinter;
 import com.graphhopper.jsprit.core.util.ManhattanCosts;
 import com.graphhopper.jsprit.core.util.Solutions;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
+import java.util.Date;
 
 
 public class MultipleTimeWindowExample {
 
 
     public static void main(String[] args) {
-
 		/*
          * get a vehicle type-builder and build a type with the typeId "vehicleType" and one capacity dimension, i.e. weight, and capacity dimension value of 2
 		 */
@@ -53,48 +53,42 @@ public class MultipleTimeWindowExample {
 		/*
          * get a vehicle-builder and build a vehicle located at (10,10) with type "vehicleType"
 		 */
-        Builder vehicleBuilder = Builder.newInstance("vehicle1");
-        vehicleBuilder.setStartLocation(Location.newInstance(0, 0));
-        vehicleBuilder.setType(vehicleType);
-        VehicleImpl vehicle = vehicleBuilder.build();
+        VehicleImpl vehicle = Builder.newInstance("vehicle1")
+            .setStartLocation(Location.newInstance(0, 0))
+            .setType(vehicleType)
+            .setEarliestStart(dateToStamp("2023-03-01 08:00:00"))   // 设置骑手打卡时间
+            .setReturnToDepot(false)
+            .build();
 
-        Builder vehicleBuilder2 = Builder.newInstance("vehicle2");
-        vehicleBuilder2.setStartLocation(Location.newInstance(0, 0));
-        vehicleBuilder2.setType(vehicleType);
-        VehicleImpl vehicle2 = vehicleBuilder2.build();
+        VehicleImpl vehicle2 = Builder.newInstance("vehicle2")
+            .setStartLocation(Location.newInstance(0, 1))
+            .setType(vehicleType)
+            .setEarliestStart(dateToStamp("2023-03-01 08:00:00"))   // 设置骑手打卡时间
+            .setReturnToDepot(false)
+            .build();
 
 		/*
          * build services at the required locations, each with a capacity-demand of 1.
 		 */
+
+        // 模拟两个订单不同方向，但同一时间送达
         Service service1 = Service.Builder.newInstance("1")
-            .addTimeWindow(20,35)
-            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(10, 0)).build();
+            .addTimeWindow(0,dateToStamp("2023-03-01 08:00:00") + 10)
+            .addSizeDimension(WEIGHT_INDEX, 1)
+            .setLocation(Location.newInstance(10, 0))
+            .build();
 
         Service service2 = Service.Builder.newInstance("2")
+            .addTimeWindow(0,dateToStamp("2023-03-01 08:00:00") + 10)
             .addSizeDimension(WEIGHT_INDEX, 1)
-//            .setServiceTime(10)
-            .setLocation(Location.newInstance(20, 0)).setServiceTime(10).build();
+            .setLocation(Location.newInstance(0, 10))
+            .build();
 
-        Service service3 = Service.Builder.newInstance("3")
-            .addTimeWindow(5, 10)
-            .addTimeWindow(35, 50)
-            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(30, 0)).build();
-
-        Service service4 = Service.Builder.newInstance("4")
-//            .addTimeWindow(5,10)
-            .addTimeWindow(20, 40)
-            .addTimeWindow(45, 80)
-            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(40, 0)).build();
-
-        Service service5 = Service.Builder.newInstance("5")
-            .addTimeWindow(5,10)
-            .addTimeWindow(20, 40)
-            .addTimeWindow(60,100)
-            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(20, 0)).build();
-
-        Service service6 = Service.Builder.newInstance("6")
-            .addTimeWindow(20,30)
-            .addSizeDimension(WEIGHT_INDEX, 1).setLocation(Location.newInstance(30, 0)).build();
+// Service service3 = Service.Builder.newInstance("3")
+//     .addTimeWindow(0,dateToStamp("2023-03-01 08:00:00") + 20)
+//     .addSizeDimension(WEIGHT_INDEX, 1)
+//     .setLocation(Location.newInstance(0, 20))
+//     .build();
 
         VehicleRoutingProblem.Builder vrpBuilder = VehicleRoutingProblem.Builder.newInstance();
         vrpBuilder
@@ -104,13 +98,11 @@ public class MultipleTimeWindowExample {
         vrpBuilder
             .addJob(service1)
             .addJob(service2)
-            .addJob(service3)
-            .addJob(service4)
-            .addJob(service5)
-            .addJob(service6)
+//            .addJob(service3)
         ;
         vrpBuilder.setFleetSize(VehicleRoutingProblem.FleetSize.FINITE);
         vrpBuilder.setRoutingCost(new ManhattanCosts());
+
         VehicleRoutingProblem problem = vrpBuilder.build();
 
 		/*
@@ -137,7 +129,22 @@ public class MultipleTimeWindowExample {
 		 */
 //        new Plotter(problem,bestSolution).setLabel(Plotter.Label.ID).plot("output/plot", "mtw");
 
-//        new GraphStreamViewer(problem, bestSolution).labelWith(Label.ID).setRenderDelay(200).display();
+        new GraphStreamViewer(problem, bestSolution)
+            .labelWith(GraphStreamViewer.Label.ID)
+            .setRenderShipments(true)
+            .setRenderDelay(500).display();
+    }
+
+    public static long dateToStamp(String s){
+        //设置时间模版
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date date;
+        try {
+            date = simpleDateFormat.parse(s);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        return date.getTime();
     }
 
 }
